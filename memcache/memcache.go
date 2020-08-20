@@ -79,7 +79,8 @@ type Stats struct {
 
 	// Slabs are indexed by slab ID.  Each has a k/v store of metrics for
 	// that slab.
-	Slabs map[int]map[string]string
+	// Slabs map[int]map[string]string
+	Slabs map[string]map[string]string
 
 	// Items are indexed by slab ID.  Each ID has a k/v store of metrics for
 	// items in that slab.
@@ -741,7 +742,7 @@ func (c *Client) statsFromAddr(addr net.Addr, cb func(Stats)) error {
 		cmds := []string{"stats\r\n", "stats slabs\r\n", "stats items\r\n"}
 		var stats Stats
 		stats.Stats = make(map[string]string)
-		stats.Slabs = make(map[int]map[string]string)
+		stats.Slabs = make(map[string]map[string]string)
 		stats.Items = make(map[int]map[string]string)
 
 		for _, cmd := range cmds {
@@ -765,16 +766,26 @@ func (c *Client) statsFromAddr(addr net.Addr, cb func(Stats)) error {
 						stats.Stats[string(s[1])] = string(bytes.TrimSpace(s[2]))
 					case 2:
 						// Slab stats
-						i, err := strconv.ParseInt(string(f[0]), 10, 64)
-						if err != nil {
-							return err
+						if string(f[0]) != "SM" {
+							i, err := strconv.ParseInt(string(f[0]), 10, 64)
+							h, ok := stats.Slabs[string(i)]
+							if !ok {
+								h = make(map[string]string)
+								stats.Slabs[string(i)] = h
+							}
+							h[string(f[1])] = string(bytes.TrimSpace(s[2]))
+							if err != nil {
+								return err
+							}
+						} else {
+							i := string(f[0])
+							h, ok := stats.Slabs[string(i)]
+							if !ok {
+								h = make(map[string]string)
+								stats.Slabs[string(i)] = h
+							}
+							h[string(f[1])] = string(bytes.TrimSpace(s[2]))
 						}
-						h, ok := stats.Slabs[int(i)]
-						if !ok {
-							h = make(map[string]string)
-							stats.Slabs[int(i)] = h
-						}
-						h[string(f[1])] = string(bytes.TrimSpace(s[2]))
 					case 3:
 						// Slab Item stats
 						i, err := strconv.ParseInt(string(f[1]), 10, 64)
